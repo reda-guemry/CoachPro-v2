@@ -1,60 +1,31 @@
 <?php
 
-    include("../PHP/connectdatabass.php") ; 
-    session_start();
+    include "../CLASS/utulusateur.class.php" ;
+    include "../CLASS/coash.class.php" ;
 
-    $selectsport = $connect -> query("SELECT * FROM sports") ;
-    $reponse = $selectsport -> fetchAll() ;
+    session_start();
      
     if($_SERVER["REQUEST_METHOD"] === 'POST'){
-        $email = trim($_POST['email'] ?? '');
-        $password = trim($_POST['password'] ?? '');
+
         $errors = [];
 
-        // Validate email
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors['email'] = "Email invalide";
-        }
-
-        // Validate password length
-        if (strlen($password) < 6) {
-            $errors['password'] = "Le mot de passe doit contenir au moins 6 caractères";
-        }
-
         if (empty($errors)) {
-            $selectuser = $connect -> prepare('SELECT * FROM users WHERE email = ?') ; 
-            $selectuser -> execute([$email]) ; 
+            $autentification = new Utulusateur_class() ; 
+            $result = $autentification -> logine($_POST['email'] , $_POST['password']) ; 
 
-            $data = $selectuser -> fetch() ; 
-
-            if($data) {
-                if(password_verify($password , $data["password"])){
-
-                    session_regenerate_id(true);
-
-                    $sesionid = session_id() ; 
-                    $usermpgine = $data["user_id"] ; 
-                    $rolelogine = $data["role"] ; 
-
-                    $insertintosesion = $connect -> prepare("INSERT INTO sesionses (sesion_id , user_id , role_user) VALUE (? , ? , ?)") ; 
-                    $insertintosesion -> execute([$sesionid , $usermpgine , $rolelogine]) ; 
-
-                    $_SESSION["sesion_id"] = $sesionid ; 
-                    $_SESSION["usermpgine"] = $usermpgine ; 
-                    $_SESSION["rolelogine"] = $rolelogine ; 
-
-                    if($_SESSION["rolelogine"] == "coach"){
-                        header("Location: dashbordcoach.php") ; 
-                    }else if($_SESSION["rolelogine"] == "sportif") {
-                        header("Location: dashbordsportif.php") ; 
-                    }
-                }else {
+            switch ($result) {
+                case "coach" : 
+                    header("Location: dashbordcoach.php") ; 
+                    break ;
+                case "sportif" :
+                    header("Location: dashbordsportif.php") ; 
+                    break ;
+                case "ereure" : 
                     header("Location: login.php") ;
-                }
-            }else {
-                header("Location: login.php") ;
+                    break ; 
             }
-        } else {
+
+        }else {
             foreach ($errors as $field => $message) {
                 echo "<p>$message</p>";
             }

@@ -1,53 +1,28 @@
 <?php
 
-    include("../PHP/connectdatabass.php") ; 
+    include "../CLASS/utulusateur.class.php" ;
+    include "../CLASS/coash.class.php" ;
+    
+    $connect = new Connect_class() ->getConnecting() ; 
 
     $selectsport = $connect -> query("SELECT * FROM sports") ;
     $reponse = $selectsport -> fetchAll() ;
      
-    if($_SERVER["REQUEST_METHOD"] === 'POST'){
-        $prenom = $_POST["prenom"] ;
-        $nom = $_POST["nom"] ;
-        $email = $_POST["email"] ;  
-        $password = $_POST["password"]; 
-        $confirmPassword = $_POST["confirmPassword"] ; 
-        $role = $_POST["role"] ;
-
-
-
+    if($_SERVER["REQUEST_METHOD"] === 'POST'){ 
+        
         if ($_POST["password"] !== $_POST["confirmPassword"]) {
             die("Password does not match the confirmation password.");
         }
-
-        $password = password_hash($password  , PASSWORD_DEFAULT); 
-
-        $insertuserprepar = $connect -> prepare('INSERT INTO users (first_name , last_name , email , password , role) VALUE ( ? , ? , ? , ? , ?)') ;
-        $insertuserprepar -> execute([$prenom , $nom , $email , $password , $role]) ;
         
-        $selectUser = $connect -> lastInsertId() ;
+        $utulusateur = new Utulusateur_class() ;
+        $selectUser =  $utulusateur -> signin($_POST["prenom"] , $_POST["nom"]  , $_POST["email"] , $_POST["password"] , $_POST["role"] ) ;  
 
-        if($role == "coach") {
-            $BioCoach = $_POST["bio"] ; 
-            $experiencecoach = $_POST["experienceYears"] ; 
-            $certificate = $_POST["certifications"] ;
-            $cpecialiter = $_POST["sports[]"];
+        if($_POST["role"] == "coach") {
+            $coachInsert = new Coash_class() ;
+            
+            $insertcoashprepare = $coachInsert -> insertcoassh($selectUser , $_POST["bio"] , $_POST["experienceYears"] , $_POST["certifications"] , $_POST["sports"] ,  $_FILES["photo"] ) ; 
 
-            $profilePhotoPath = '';
-            if($_FILES["photo"]["error"] == 0 ){
-                $nameProfilePhoto =  $_FILES["photo"]["name"] ; 
-                $uploadDirectionProfile = "../IMG/PROFILESPHOTO" . $nameProfilePhoto ;
-                move_uploaded_file( $_FILES["photo"]["tmp_name"] , $uploadDirectionProfile) ;
-                $profilePhotoPath = '../IMG/PROFILESPHOTO' . $nameProfilePhoto ; 
-            }
-
-            $insertcoashprepare = $connect -> prepare('INSERT INTO coach_profile (coach_id , bio , experience_year , certification , photo) VALUE ( ? , ? , ? , ? , ?)') ; 
-            $insertcoashprepare -> execute([$selectUser , $BioCoach , $experiencecoach , $certificate , $profilePhotoPath]) ;
-        
-            foreach($cpecialiter as $speciait){
-                $insertintosportcoash = $connect -> prepare("INSERT INTO coach_sport (sport_id , coach_id) VALUE ( ? , ? )") ;
-                $insertintosportcoash -> execute([ $speciait , $selectUser ]) ; 
-            }
-            if($insertcoashprepare -> rowCount() > 0) {
+            if($insertcoashprepare > 0) {
                 header("Location: login.php") ; 
                 exit() ; 
             }else {
@@ -56,10 +31,9 @@
             }
         }
 
-        if($selectUser ) {
+        if($selectUser) {
             header("Location: login.php") ; 
             exit() ; 
-
         }else {
             header("Location: signin.php") ;
         }
