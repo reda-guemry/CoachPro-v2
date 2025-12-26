@@ -4,9 +4,11 @@
     include "../CLASS/coash.class.php" ;
     
     $connect = new Connect_class() ->getConnecting() ; 
+    
+    $coach = new Coash_class() ; 
 
-    $selectsport = $connect -> query("SELECT * FROM sports") ;
-    $reponse = $selectsport -> fetchAll() ;
+    $reponse = $coach -> getallsport() ;
+
      
     if($_SERVER["REQUEST_METHOD"] === 'POST'){ 
         
@@ -301,7 +303,7 @@
             <div class="text-center">
                 <p class="text-gray-600">
                     Vous avez déjà un compte?
-                    <a href="login.html" class="text-purple-600 hover:text-purple-800 font-bold">
+                    <a href="login.php" class="text-purple-600 hover:text-purple-800 font-bold">
                         Connectez-vous
                     </a>
                 </p>

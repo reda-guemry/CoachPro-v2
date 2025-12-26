@@ -58,5 +58,40 @@
                 return "ereure" ; 
             }
         }
-        
+
+        public static function logout() {
+            session_start() ; 
+            $_SESSION = [] ; 
+
+            if(ini_get("session.use_cookies")){
+                $params = session_get_cookie_params() ; 
+                setcookie(
+                    session_name() ,
+                   "" , 
+      time() - 1000 , 
+                    $params["path"],
+                  $params["domain"],
+                  $params["secure"],
+                $params["httponly"]
+                ) ; 
+            }
+            session_destroy() ;
+
+            header("Location: login.php");
+            exit;
+        }
+
+        public static function checksesion() {
+            if(!isset($_SESSION["usermpgine"])){
+                header("Location: login.php");
+            }
+        }
+
+        public static function checkrole($role) {
+            self::checksesion() ; 
+            if($_SESSION["rolelogine"] !== $role){
+                header("Location: login.php");
+                exit;
+            }
+        }
     }

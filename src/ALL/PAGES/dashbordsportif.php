@@ -1,8 +1,12 @@
 <?php 
 
-    include("../PHP/connectdatabass.php") ; 
-     
+    include("../CLASS/reservations.class.php") ;
+    include("../CLASS/sportif.class.php") ;
+    include("../CLASS/utulusateur.class.php") ;
+
     session_start() ; 
+
+    Utulusateur_class::checksesion() ; 
 
     $statusColors = [ 
         "pending" => 'bg-yellow-100 text-yellow-800',
@@ -11,75 +15,39 @@
         "cancelled" => 'bg-gray-100 text-gray-800'
     ];
 
-    $check = $connect -> query ("SELECT u.* , c.* from users u  inner join coach_profile c on u.user_id = c.coach_id"); 
-    $result = $check -> fetchAll() ; 
+    $sportif = new Sportif_class() ;
+    $reservation = new Reservations_class() ;  
 
-    $allcoach = [] ;
+    $allcoach = $sportif -> getallcoach() ;
 
-    foreach($result as $evrycoash ){
-        $idcoash = $evrycoash["coach_id"] ; 
-        $check = $connect -> query ("SELECT s.sport_name 
-                                            FROM coach_profile c
-                                            INNER JOIN coach_sport cs ON cs.coach_id = c.coach_id 
-                                            INNER JOIN sports s ON cs.sport_id = s.sport_id 
-                                            WHERE c.coach_id = $idcoash"); 
-        $sports = $check -> fetchAll() ;
-        $evrycoash["sports"] = $sports ; 
-        $allcoach[] = $evrycoash ;
-    }
+    $result = $sportif -> getallreservetion($_SESSION["usermpgine"]) ; 
 
-    $sportif_id = $_SESSION["usermpgine"] ;
+    if($_SERVER["REQUEST_METHOD"] === 'POST'){        
+        if(isset($_POST["action"]) && $_POST["action"] === "addReservation"){
 
+            Utulusateur_class::checkrole("sportif") ;
 
-    $selectallbock = $connect -> prepare ("SELECT u.user_id , u.first_name , u.last_name , b.booking_id , b.status , a.availabilites_date , a.start_time , a.end_time
-                                                FROM users u 
-                                                INNER JOIN bookings b ON u.user_id = b.coach_id 
-                                                INNER JOIN availabilites a ON a.availability_id = b.availability_id
-                                                WHERE b.sportif_id = ?") ;
+            $reservation -> addreservation(
+                $_SESSION["usermpgine"] ,
+                $_POST["coach_id"] ,
+                $_POST["seanseSelect"]
+                ) ;  
+        }else if (isset($_POST["action"]) && $_POST["action"] === "annulerReservation") {
+            Utulusateur_class::checkrole("sportif") ;
 
-    $selectallbock -> execute(["$sportif_id"]) ;
-    $result = $selectallbock -> fetchAll() ; 
+            $reservation -> cancelreservation($_POST["bookingId"]) ; 
+        }else if (isset($_POST["action"]) && $_POST["action"] === "reviewform") {
+            Utulusateur_class::checkrole("sportif") ;
 
-    if($_SERVER["REQUEST_METHOD"] === 'POST'){
-        if(isset($_POST['date'])) {
-            $userID = $_SESSION["usermpgine"] ;
-            $coachId = $_POST['coach_id'] ;
-            $date = $_POST['date'] ;
-            $time = $_POST['time'] ;
-            $status = 'pending' ;
-
-            $modifstatuavail = $connect -> prepare("UPDATE availabilites SET status = 'booked' WHERE availability_id = ? ") ;
-            $modifstatuavail -> execute([$time]) ; 
-
-            $insertrese = $connect -> prepare("INSERT INTO bookings (sportif_id , coach_id , availability_id , status) VALUE (? , ? , ? , ?);") ; 
-            $insertrese -> execute([$userID , $coachId , $time , $status]) ; 
-
-            
-            $idinitial = $connect -> lastInsertId() ; 
-            $datareponse = $connect -> query ("SELECT * FROM bookings WHERE booking_id ='$idinitial'") ;
-            header("Location: dashbordsportif.php");
-            exit;
-        }else if(isset($_POST['bookingId'])) {
-
-            $bookingId = $_POST['bookingId'] ;
-            $stmt = $connect->prepare("SELECT availability_id FROM bookings WHERE booking_id = ?");
-            $stmt->execute([$bookingId]);
-            $booking = $stmt->fetch();
-
-            $availabilityId = $booking['availability_id'];
-
-            $update = $connect->prepare("UPDATE availabilites SET status = 'available' WHERE availability_id = ?");
-            $update->execute([$availabilityId]);
-
-            $delete = $connect->prepare("DELETE FROM bookings WHERE booking_id = ?");
-            $delete->execute([$bookingId]);
-            header("Location: dashbordsportif.php");
-            exit;
+            $reservation -> addreview($_POST["coash_id"] , $_POST["reviewBookingId"] , $_POST["ratingValue"] , $_POST["reviewComment"]) ; 
+        }else if (isset($_POST["action"]) && $_POST["action"] === "logout"){
+            Utulusateur_class::logout() ; 
         }
-    }
 
 
-    
+        header("Location: dashbordsportif.php");
+        exit;  
+    }    
 ?>
 
 
@@ -109,9 +77,11 @@
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-gray-700 font-medium">Bonjour, <span id="userName">Sportif</span></span>
-                    <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition duration-300">
-                        <i class="fas fa-sign-out-alt mr-2"></i>Déconnexion
-                    </button>
+                    <form method="post">
+                        <button type="submit" name="action" value="logout" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition duration-300">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Déconnexion
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -245,16 +215,16 @@
                                 <?php if ($booking["status"] === 'accepted'): ?>
                                     <button
                                         onclick="openReviewModal(<?= (int)$booking['booking_id'] ?>, <?= (int)$booking['user_id'] ?>)"
-                                        class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs transition duration-300">
+                                        class="w-full flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs transition duration-300">
                                         <i class="fas fa-star mr-1"></i>Avis
                                     </button>
                                 <?php endif; ?>
 
                                 <?php if ($booking["status"] === 'pending' || $booking["status"] === 'accepted'): ?>
-                                    <form method="post" >
+                                    <form method="post" class="flex-1 h-full">
                                         <input type="hidden" name="bookingId" value="<?= (int)$booking['booking_id'] ?>">
-                                        <button type="submit"
-                                            class="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs transition duration-300">
+                                        <button type="submit" name="action" value="annulerReservation"
+                                            class="w-full h-full flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs transition duration-300">
                                             <i class="fas fa-times mr-1"></i>Annuler
                                         </button>
                                     </form>
@@ -280,6 +250,7 @@
             </div>
             <form id="bookingForm" method="post" >
                 <input type="hidden" id="selectedCoachId" name="coach_id">
+                <input type="hidden" name="action" value="addReservation">
                 <div class="mb-4">
                     <label class="block text-gray-700 font-semibold mb-2">Coach</label>
                     <p id="selectedCoachName" class="text-gray-600 font-medium"></p>
@@ -288,13 +259,13 @@
                     <label for="bookingDate" class="block text-gray-700 font-semibold mb-2">
                         <i class="fas fa-calendar mr-2 text-purple-600"></i>Date
                     </label>
-                    <input type="date" name="date" id="bookingDate" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
+                    <input type="date"  id="bookingDate" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
                 </div>
                 <div class="mb-6">
                     <label for="availabilitySelect" class="block text-gray-700 font-semibold mb-2">
                         <i class="fas fa-clock mr-2 text-purple-600"></i>Créneau disponible
                     </label>
-                    <select id="availabilitySelect" name="time" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
+                    <select id="availabilitySelect" name="seanseSelect" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
                         <option value="">Sélectionnez d'abord une date</option>
                     </select>
                 </div>
@@ -314,9 +285,9 @@
                     <i class="fas fa-times text-2xl"></i>
                 </button>
             </div>
-            <form id="reviewForm">
-                <input type="hidden" id="reviewBookingId">
-                <input type="hidden" id="coash_id">
+            <form id="reviewForm" method="post">
+                <input type="hidden" id="reviewBookingId" name="reviewBookingId">
+                <input type="hidden" id="coash_id" name="coash_id">
                 <div class="mb-4">
                     <label class="block text-gray-700 font-semibold mb-2">
                         <i class="fas fa-star mr-2 text-yellow-500"></i>Note
@@ -328,21 +299,23 @@
                         <i class="fas fa-star text-3xl text-gray-300 cursor-pointer hover:text-yellow-500" data-rating="4"></i>
                         <i class="fas fa-star text-3xl text-gray-300 cursor-pointer hover:text-yellow-500" data-rating="5"></i>
                     </div>
-                    <input type="hidden" id="ratingValue" required>
+                    <input type="hidden" id="ratingValue" name="ratingValue" required>
                 </div>
                 <div class="mb-6">
                     <label for="reviewComment" class="block text-gray-700 font-semibold mb-2">
                         <i class="fas fa-comment mr-2 text-purple-600"></i>Commentaire
                     </label>
-                    <textarea id="reviewComment" rows="4" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600" placeholder="Partagez votre expérience..."></textarea>
+                    <textarea id="reviewComment" name="reviewComment" rows="4" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600" placeholder="Partagez votre expérience..."></textarea>
                 </div>
-                <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300">
+                <button type="submit" name="action" value="reviewform" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-3 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300">
                     <i class="fas fa-paper-plane mr-2"></i>Envoyer l'avis
                 </button>
             </form>
         </div>
     </div>
 
-    <script type="module" src="../JS/dashbordsportif.js"></script>
+    <script src="../JS/dashbordsportif.js"></script>
+
+    
 </body>
 </html>

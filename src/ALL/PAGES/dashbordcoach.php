@@ -1,78 +1,67 @@
 <?php 
 
-    include("../PHP/connectdatabass.php") ; 
+    include("../CLASS/seanse.class.php") ; 
+    include("../CLASS/reservations.class.php") ; 
+    include("../CLASS/coash.class.php") ; 
      
     session_start() ; 
 
-    $coach_id = $_SESSION["usermpgine"];
+    Coash_class::checksesion() ; 
 
-    $datareponse = $connect -> prepare ("SELECT * FROM availabilites WHERE coach_id = ?") ;
-    $datareponse -> execute([$coach_id]) ; 
-    $availabilities = $datareponse -> fetchAll() ;
+    $seanse = new Seanse_class($_SESSION["usermpgine"]) ;
 
+    $reservation = new Reservations_class() ; 
+
+    $coach = new Coash_class();
+    
     $statusColors = [
         'available' => 'bg-green-100 text-green-800',
         'booked' => 'bg-blue-100 text-blue-800',
         'cancelled' => 'bg-red-100 text-red-800'
     ];
-
-    $stmt = $connect->prepare("SELECT  b.booking_id, b.status, u.first_name, u.last_name, a.availabilites_date, a.start_time, a.end_time
-        FROM bookings b
-        INNER JOIN users u ON u.user_id = b.sportif_id
-        INNER JOIN availabilites a ON a.availability_id = b.availability_id
-        WHERE b.coach_id = ?
-        AND b.status = 'pending'
-    ");
-    $stmt->execute([$coach_id]);
-
-    $pendingBookings = $stmt->fetchAll();
+    
+    $availabilities = $seanse -> getallseanse() ;
+    $reviews = $coach -> getallreviews($_SESSION["usermpgine"]);
+    $pendingBookings = $reservation -> getallreservation($_SESSION["usermpgine"]);
+    $accceptseanse = $coach -> getallacceptseanse($_SESSION["usermpgine"]) ;
 
     if($_SERVER["REQUEST_METHOD"] === 'POST'){
-        if(isset($_POST["date"])) {
-            $date = $_POST['date'];
-            $start_time = $_POST['start'];
-            $end_time = $_POST['end'];
-            $status = "available";
-            if($start_time < $end_time){
-                $insetinavailibity = $connect->prepare("INSERT INTO availabilites (coach_id, availabilites_date, start_time, end_time, status) VALUES (?, ?, ?, ?, ?)");
+        if(isset($_POST["action"]) && $_POST["action"] === "addSeanse") {
+            if($_POST['start'] < $_POST['end']){
+
+                Coash_class::checkrole("coach") ; 
+                
+                $seanse -> setSeanceData($_POST['date'] , $_POST['start'] , $_POST['end']) ; 
         
-                $insetinavailibity->execute([$coach_id, $date, $start_time, $end_time, $status]);
-        
-                $idinitial = $connect -> lastInsertId() ; 
-                $datareponse = $connect -> query ("SELECT * FROM availabilites WHERE availability_id ='$idinitial'") ;   
+                $seanse -> saveseanse() ;    
             }
-            header("Location: dashbordcoach.php");
-            exit;
         }else if (isset($_POST["action"]) && $_POST["action"] === "accept") {
-            echo $_POST["action"] ; 
-            $bookingId = $_POST['booking_id'] ;
 
-            $delete = $connect->prepare("UPDATE bookings SET status = 'accepted' WHERE booking_id  = ?");
-            
-            $delete->execute([$bookingId]);
-            header("Location: dashbordcoach.php");
-            exit;
+            Coash_class::checkrole("coach") ; 
+
+            $reservation -> acceptreservation($_POST['booking_id']) ; 
+
         }else if (isset($_POST["action"]) && $_POST["action"] === "reject"){
-            echo $_POST["action"] ; 
 
-            $bookingId = $_POST['booking_id'] ;
+            Coash_class::checkrole("coach") ; 
 
-            $stmt = $connect->prepare("SELECT availability_id FROM bookings WHERE booking_id = ?");
-            $stmt->execute([$bookingId]);
-            $booking = $stmt->fetch();
+            $reservation -> refuseresrvation($_POST['booking_id']) ; 
 
-            $availabilityId = $booking['availability_id'];
+        }else if (isset($_POST["action"]) && $_POST["action"] === "annulerSeanbse"){
+            
+            Coash_class::checkrole("coach") ; 
+            
+            $seanse -> supprimerseanse($_POST["availability_id"]) ;
 
-            $update = $connect->prepare(query: "UPDATE availabilites SET status = 'available' WHERE availability_id = ?");
-            $update->execute([$availabilityId]);
-
-            $delete = $connect->prepare("UPDATE bookings SET status = 'cancelled' WHERE booking_id  = ?");
-            $delete->execute([$bookingId]);
-            header("Location: dashbordcoach.php");
-            exit;
+        }else if (isset($_POST["action"]) && $_POST["action"] === "logout"){
+            Coash_class::logout() ; 
         }
+
+        header(header: "Location: dashbordcoach.php");
+        exit;
     }
     
+
 ?>
 
 
@@ -104,13 +93,15 @@
                     <span class="text-2xl font-bold text-gray-800">CoachPro</span>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <a href="coashprofile.html" class="text-gray-700 hover:text-purple-600 font-medium transition duration-300">
+                    <a href="coashprofile.php" class="text-gray-700 hover:text-purple-600 font-medium transition duration-300">
                         <i class="fas fa-user-circle mr-1"></i>Mon Profil
                     </a>
                     <span class="text-gray-700 font-medium">Bonjour, <span id="coachName">Coach</span></span>
-                    <button onclick="logout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition duration-300">
-                        <i class="fas fa-sign-out-alt mr-2"></i>Déconnexion
-                    </button>
+                    <form method="post">
+                        <button type="submit" name="action" value="logout" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition duration-300">
+                            <i class="fas fa-sign-out-alt mr-2"></i>Déconnexion
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -214,14 +205,14 @@
                                         </button>
                                     </form>
                                     <form method="post" class="flex-1 h-full">
-                                        <input type="hidden" name="booking_id" value="<?= $boking['booking_id']; ?>">
+                                        <input type="hidden" name="booking_id" value="<?= $boking['booking_id'] ?>">
                                         <button type="submit" name="action" value="reject" class="w-full h-full bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition duration-300 flex items-center justify-center">
                                             <i class="fas fa-times mr-1"></i>Refuser
                                         </button>
                                     </form>
                                 </div>
                             </div>
-                        <?php  }?>
+                        <?php }?>
                     </div>
                 </div>
 
@@ -231,7 +222,34 @@
                         <i class="fas fa-check-circle text-green-600 mr-2"></i>Séances Validées
                     </h2>
                     <div id="acceptedSessionsList" class="space-y-4 max-h-96 overflow-y-auto">
-                        <!-- Accepted sessions will be loaded here -->
+                        <?php foreach ($accceptseanse as $session) : ?>
+
+                            <div class="border-2 border-green-200 bg-green-50 rounded-lg p-4 mb-3">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h4 class="font-bold text-gray-800">
+                                            <i class="fas fa-user text-purple-600 mr-2"></i>
+                                            <?= $session['first_name'] . ' ' . $session['last_name']; ?>
+                                        </h4>
+
+                                        <p class="text-sm text-gray-600 mt-1">
+                                            <i class="fas fa-calendar mr-1"></i>
+                                            <?= $session['availabilites_date']; ?>
+                                        </p>
+
+                                        <p class="text-sm text-gray-600">
+                                            <i class="fas fa-clock mr-1"></i>
+                                            <?= $session['start_time'] . ' - ' . $session['end_time']; ?>
+                                        </p>
+                                    </div>
+
+                                    <span class="px-3 py-1 bg-green-200 text-green-800 rounded-full text-xs font-semibold">
+                                        <i class="fas fa-check-circle mr-1"></i>Validée
+                                    </span>
+                                </div>
+                            </div>
+
+                        <?php endforeach; ?>
                     </div>
                 </div>
             </div>
@@ -256,7 +274,7 @@
                             <label for="endTime" class="block text-gray-700 font-semibold mb-2">Heure fin</label>
                             <input type="time" id="endTime" name="end" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
                         </div>
-                        <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-2 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300">
+                        <button type="submit" name="action" value="addSeanse" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-2 rounded-lg hover:from-purple-700 hover:to-indigo-700 transition duration-300">
                             <i class="fas fa-plus mr-2"></i>Ajouter
                         </button>
                     </form>
@@ -284,9 +302,9 @@
                                             </span>
                                         </div>
                                         <?php if ($avail['status'] === 'available') {  ?>
-                                            <form method="POST" action="deleteAvailability.php">
+                                            <form method="POST">
                                                 <input type="hidden" name="availability_id" value="<?= $avail['availability_id'] ?>">
-                                                <button type="submit" class="w-full bg-red-500 hover:bg-red-600 text-white text-xs py-1 rounded transition duration-300">
+                                                <button type="submit" name="action" value="annulerSeanbse" class="w-full bg-red-500 hover:bg-red-600 text-white text-xs py-1 rounded transition duration-300">
                                                     <i class="fas fa-trash mr-1"></i>Supprimer
                                                 </button>
                                             </form>
@@ -304,7 +322,31 @@
                         <i class="fas fa-star text-yellow-500 mr-2"></i>Avis Reçus
                     </h2>
                     <div id="reviewsList" class="space-y-3 max-h-64 overflow-y-auto">
-                        <!-- Reviews will be loaded here -->
+                        <?php foreach($reviews as $review) { ?>
+                            <div class="border-2 border-gray-200 rounded-lg p-3">
+                                <div class="flex justify-between items-start mb-2">
+                                    <p class="font-semibold text-gray-800 text-sm">
+                                        <?= $review['first_name'] . ' ' . $review['last_name']; ?>
+                                    </p>
+
+                                    <div class="flex items-center">
+                                        <?php
+                                            for ($i = 0; $i < $review['ratting']; $i++) {
+                                                echo '<i class="fas fa-star text-yellow-500 text-xs"></i>';
+                                            }
+
+                                            for ($i = 0; $i < (5 - $review['ratting']); $i++) {
+                                                echo '<i class="fas fa-star text-gray-300 text-xs"></i>';
+                                            }
+                                        ?>
+                                    </div>
+                                </div>
+
+                                <p class="text-gray-600 text-xs mb-1">
+                                    <?= $review['commentaire']; ?>
+                                </p>
+                            </div>
+                        <?php } ?>
                     </div>
                 </div>
             </div>

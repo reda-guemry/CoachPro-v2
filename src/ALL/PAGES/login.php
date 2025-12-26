@@ -126,7 +126,7 @@
             <div class="text-center">
                 <p class="text-gray-600">
                     Vous n'avez pas de compte?
-                    <a href="signin.html" class="text-purple-600 hover:text-purple-800 font-bold">
+                    <a href="signin.php" class="text-purple-600 hover:text-purple-800 font-bold">
                         Inscrivez-vous
                     </a>
                 </p>

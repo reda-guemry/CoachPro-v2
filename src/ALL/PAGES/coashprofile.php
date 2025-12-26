@@ -1,3 +1,43 @@
+<?php
+
+    include "../CLASS/utulusateur.class.php" ;
+    include "../CLASS/coash.class.php" ;
+
+    session_start() ; 
+
+    $coach = new Coash_class() ; 
+    $reponse = $coach -> getallsport() ;
+
+    $coachinformation = $coach -> getallcoachinfo($_SESSION["usermpgine"]) ; 
+
+    
+    $coachSports = array_column($coachinformation['sports'], 'sport_id');
+
+    if($_SERVER["REQUEST_METHOD"] == "POST") {
+        if(isset($_POST["action"]) && $_POST["action"] === "modifierprofile") {
+            $profilePhotoFile = $_FILES['profilePhotoinput'] ?? null;
+            $coach -> modifierprofilecoach(
+                $_SESSION['usermpgine'],
+                $_POST['firstName'],
+                $_POST['lastName'],
+                $_POST['email'],
+                $_POST['bio'],
+                $_POST['experienceYears'],
+                $_POST['certifications'],
+                $_POST['sports'] ?? [],
+                $profilePhotoFile , 
+                $_POST["newPassword"] ,
+                $_POST["currentPassword"] 
+            );
+        }
+
+        header("Location: coashprofile.php") ;
+        exit() ;
+    }
+
+?>
+
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -39,15 +79,19 @@
         <div class="bg-white rounded-xl shadow-lg p-8 mb-6">
             <div class="flex items-center space-x-6">
                 <div class="relative">
-                    <img id="profilePhoto" src="https://via.placeholder.com/150" alt="Photo de profil" class="w-32 h-32 rounded-full object-cover border-4 border-purple-600">
-                    <button onclick="document.getElementById('photoInput').click()" class="absolute bottom-0 right-0 bg-purple-600 hover:bg-purple-700 text-white rounded-full p-2 transition duration-300">
+                    <img id="profilePhoto" src="<?= $coachinformation['photo'] ?? 'https://via.placeholder.com/150' ?>" alt="Photo de profil" class="w-32 h-32 rounded-full object-cover border-4 border-purple-600">
+                    <button onclick="document.getElementById('profilePhotoinput').click()" class="absolute bottom-0 right-0 bg-purple-600 hover:bg-purple-700 text-white rounded-full p-2 transition duration-300">
                         <i class="fas fa-camera"></i>
                     </button>
-                    <input type="file" id="photoInput" accept="image/*" class="hidden" onchange="previewPhoto(event)">
                 </div>
                 <div class="flex-1">
-                    <h1 class="text-3xl font-bold text-gray-800" id="displayName">Nom du Coach</h1>
-                    <p class="text-gray-600" id="displayEmail">email@example.com</p>
+                    <h1 id="displayName" class="text-3xl font-bold text-gray-800" >
+                        <?= htmlspecialchars($coachinformation['first_name'].' '.$coachinformation['last_name']) ?>
+                    </h1>
+
+                    <p id="displayEmail" class="text-gray-600">
+                        <?= htmlspecialchars($coachinformation['email']) ?>
+                    </p>
                     <div class="flex items-center mt-2">
                         <span class="text-yellow-500 mr-1"><i class="fas fa-star"></i></span>
                         <span class="text-lg font-semibold" id="displayRating">4.8</span>
@@ -63,28 +107,30 @@
                 <i class="fas fa-user-edit text-purple-600 mr-2"></i>Informations du Profil
             </h2>
 
-            <form id="profileForm">
+            <form id="profileForm" method="POST" enctype="multipart/form-data">
                 <!-- Personal Information -->
                 <div class="mb-8">
                     <h3 class="text-xl font-semibold text-gray-800 mb-4 border-b-2 border-purple-600 pb-2">
                         <i class="fas fa-user mr-2"></i>Informations Personnelles
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <input type="hidden" name="action" value="modifierprofile">
+                        <input type="file" name="profilePhotoinput" id="profilePhotoinput" accept="image/*" class="hidden" onchange="previewPhoto(event)">
                         <div>
                             <label for="firstName" class="block text-gray-700 font-semibold mb-2">Prénom</label>
-                            <input type="text" id="firstName" name="firstName" value="Ahmed" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
+                            <input type="text" id="firstName" name="firstName"
+                                   value="<?= htmlspecialchars($coachinformation['first_name']) ?>" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
                         </div>
                         <div>
                             <label for="lastName" class="block text-gray-700 font-semibold mb-2">Nom</label>
-                            <input type="text" id="lastName" name="lastName" value="Benali" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
+                            <input type="text" id="lastName" name="lastName"
+                                   value="<?= htmlspecialchars($coachinformation['last_name']) ?>" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
+
                         </div>
-                        <div>
-                            <label for="email" class="block text-gray-700 font-semibold mb-2">Email</label>
-                            <input type="email" id="email" name="email" value="ahmed.benali@example.com" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
-                        </div>
-                        <div>
-                            <label for="phone" class="block text-gray-700 font-semibold mb-2">Téléphone</label>
-                            <input type="tel" id="phone" name="phone" value="06 12 34 56 78" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
+                        <div class="col-start-1 col-end-3">
+                            <label for="email" class="block  text-gray-700 font-semibold mb-2">Email</label>
+                            <input type="email" id="email" name="email"
+                                   value="<?= htmlspecialchars($coachinformation['email']) ?> " class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
                         </div>
                     </div>
                 </div>
@@ -100,7 +146,8 @@
                         <label for="bio" class="block text-gray-700 font-semibold mb-2">
                             <i class="fas fa-align-left text-purple-600 mr-2"></i>Biographie
                         </label>
-                        <textarea id="bio" name="bio" rows="6" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600" placeholder="Présentez-vous, parlez de votre parcours...">Coach professionnel avec 10 ans d'expérience dans le football. Passionné par le développement des jeunes talents et l'amélioration des performances sportives.</textarea>
+                        <textarea id="bio" name="bio" rows="6" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600" ><?= htmlspecialchars($coachinformation['bio']) ?></textarea>
+
                         <p class="text-sm text-gray-500 mt-1">
                             <span id="bioCount">0</span>/500 caractères
                         </p>
@@ -111,7 +158,8 @@
                         <label for="experienceYears" class="block text-gray-700 font-semibold mb-2">
                             <i class="fas fa-calendar-alt text-purple-600 mr-2"></i>Années d'Expérience
                         </label>
-                        <input type="number" id="experienceYears" name="experienceYears" value="10" min="0" max="50" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
+                        <input type="number" id="experienceYears" name="experienceYears"
+                               value="<?= (int)$coachinformation['experience_year'] ?>"  value="10" min="0" max="50" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600">
                     </div>
 
                     <!-- Certifications -->
@@ -119,7 +167,9 @@
                         <label for="certifications" class="block text-gray-700 font-semibold mb-2">
                             <i class="fas fa-certificate text-purple-600 mr-2"></i>Certifications
                         </label>
-                        <input type="text" id="certifications" name="certifications" value="UEFA B, CAF, BPJEPS" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600" placeholder="Ex: UEFA B, BPJEPS, etc.">
+                        <input type="text" id="certifications" name="certifications"
+                               value="<?= htmlspecialchars($coachinformation['certification']) ?>" required class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-purple-600" placeholder="Ex: UEFA B, BPJEPS, etc.">
+
                         <p class="text-sm text-gray-500 mt-1">Séparez les certifications par des virgules</p>
                     </div>
 
@@ -129,8 +179,13 @@
                             <i class="fas fa-trophy text-purple-600 mr-2"></i>Disciplines Sportives
                         </label>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="sportselect">
-                            
-                        </div>
+                            <?php foreach($reponse as $sport) {?>
+                                <label class="flex items-center p-3 border-2 border-gray-300 rounded-lg cursor-pointer hover:border-purple-600 transition duration-300">
+                                    <input type="checkbox" name="sports[]" value="<?= $sport["sport_id"] ?>" class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500" <?= in_array($sport['sport_id'], $coachSports) ? 'checked' : '' ?>>
+                                    <span class="ml-3 text-gray-700"><?= $sport["sport_name"] ?></span>
+                                </label>
+                            <?php } ?>
+                        </div>    
                         <span class="text-red-500 text-sm hidden" id="sportsError">Veuillez sélectionner au moins une discipline</span>
                     </div>
                 </div>
